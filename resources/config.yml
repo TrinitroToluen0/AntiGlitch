@@ -1,0 +1,12 @@
+Prevent-Pearling-In-Small-Areas: false
+Prevent-Pearling-While-Suffocating: true
+Prevent-Place-Block-Glitching: true
+Prevent-Break-Block-Glitching: true
+Prevent-Open-Door-Glitching: true
+Prevent-Command-Glitching: true
+CancelPearl-In-Small-Area-Message: false
+CancelPearl-While-Suffocating-Message: false
+CancelBlockPlace-Message: false
+CancelBlockBreak-Message: false
+CancelOpenDoor-Message: false
+CancelCommand-Message: "§7[§bAntiGlitch§7] §cCommand Cancelled due to invalid format!"
