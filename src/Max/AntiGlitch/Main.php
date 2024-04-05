@@ -271,9 +271,10 @@ class Main extends PluginBase implements Listener {
 				foreach ($event->getTransaction()->getBlocks() as [$x, $y, $z, $block]) {
 					$blockPos = $block->getPosition();
 					$blockX = intval($blockPos->getX());
+					$blockY = intval($blockPos->getY());
 					$blockZ = intval($blockPos->getZ());
 
-					if (($blockX == (int)$playerX) and ($blockZ == (int)$playerZ) and ($playerY > $block->getY())) { #If block is under the player
+					if (($blockX == (int)$playerX) and ($blockZ == (int)$playerZ) and ($playerY > $blockY)) { #If block is under the player
 						$playerMotion = $player->getMotion();
 						$this->getScheduler()->scheduleDelayedTask(new MotionTask($player, new Vector3($playerMotion->getX(), -0.1, $playerMotion->getZ())), 2);
 						if ($this->getConfig()->get("CancelBlockPlace-Message")) $player->sendMessage($this->getConfig()->get("CancelBlockPlace-Message"));
