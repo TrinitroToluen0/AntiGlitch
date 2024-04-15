@@ -19,46 +19,49 @@ use pocketmine\entity\Location;
 
 use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\entity\{ProjectileHitEvent, EntityTeleportEvent};
-use pocketmine\event\block\{BlockBreakEvent, BlockPlaceEvent};
-
+use pocketmine\event\block\BlockPlaceEvent;
+use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\event\server\CommandEvent;
 
-class Main extends PluginBase implements Listener {
+class Main extends PluginBase implements Listener
+{
 
-    private $pearlLand;
+	private $pearlLand;
 
-    public function onEnable(): void {
+	public function onEnable(): void
+	{
 		$this->getServer()->getPluginManager()->registerEvents($this, $this);
 		$this->saveDefaultConfig();
-    }
+	}
 
+	public function onPearlLandBlock(ProjectileHitEvent $event)
+	{
+		$player = $event->getEntity()->getOwningEntity();
+		if ($player instanceof Player && $event->getEntity() instanceof EnderPearl) $this->pearlLand[$player->getName()] = $this->getServer()->getTick();
+	}
 
-    public function onPearlLandBlock(ProjectileHitEvent $event) {
-        $player = $event->getEntity()->getOwningEntity();
-        if ($player instanceof Player && $event->getEntity() instanceof EnderPearl) $this->pearlLand[$player->getName()] = $this->getServer()->getTick();
-    }
+	public function onTP(EntityTeleportEvent $event)
+	{
+		$entity = $event->getEntity();
+		if (!$entity instanceof Player) return;
 
-    public function onTP(EntityTeleportEvent $event) {
-        $entity = $event->getEntity();
-        if (!$entity instanceof Player) return;
+		$level = $entity->getWorld();
 
-        $level = $entity->getWorld();
+		$to = $event->getTo();
+		if (!isset($this->pearlLand[$entity->getName()])) return;
+		if ($this->getServer()->getTick() != $this->pearlLand[$entity->getName()]) return; //Check if teleportation was caused by enderpearl (by checking is a projectile landed at the same time as teleportation) TODO Find a less hacky way of doing this?
 
-        $to = $event->getTo();
-        if (!isset($this->pearlLand[$entity->getName()])) return;
-        if ($this->getServer()->getTick() != $this->pearlLand[$entity->getName()]) return; //Check if teleportation was caused by enderpearl (by checking is a projectile landed at the same time as teleportation) TODO Find a less hacky way of doing this?
+		//Get coords and adjust for negative quadrants.
+		$x = $to->getX();
+		$y = $to->getY();
+		$z = $to->getZ();
+		if ($x < 0) $x = $x - 1;
+		if ($z < 0) $z = $z - 1;
 
-        //Get coords and adjust for negative quadrants.
-        $x = $to->getX();
-        $y = $to->getY();
-        $z = $to->getZ();
-        if($x < 0) $x = $x - 1;
-        if($z < 0) $z = $z - 1;
+		//If pearl is in a block as soon as it lands (which could only mean it was shot into a block over a fence), put it back down in the fence. TODO Find a less hacky way of doing this?
+		if ($this->isInHitbox($level, $x, $y, $z)) $y = $y - 0.5;
 
-        //If pearl is in a block as soon as it lands (which could only mean it was shot into a block over a fence), put it back down in the fence. TODO Find a less hacky way of doing this?
-        if($this->isInHitbox($level, $x, $y, $z)) $y = $y - 0.5;
-
-        if ($this->isInHitbox($level, $entity->getLocation()->getX(), $entity->getLocation()->getY() + 1.5, $entity->getLocation()->getZ())) {
+		if ($this->isInHitbox($level, $entity->getLocation()->getX(), $entity->getLocation()->getY() + 1.5, $entity->getLocation()->getZ())) {
 			if ($this->getConfig()->get("Prevent-Pearling-While-Suffocating")) {
 				if ($this->getConfig()->get("CancelPearl-While-Suffocating-Message")) {
 					$entity->sendMessage($this->getConfig()->get("CancelPearl-While-Suffocating-Message"));
@@ -68,9 +71,9 @@ class Main extends PluginBase implements Listener {
 			}
 		}
 
-        //Try to find a good place to teleport.
+		//Try to find a good place to teleport.
 		$ys = $y;
-        foreach (range(0, 1.9, 0.05) as $n) {
+		foreach (range(0, 1.9, 0.05) as $n) {
 			$xb = $x;
 			$yb = ($ys - $n);
 			$zb = $z;
@@ -81,28 +84,28 @@ class Main extends PluginBase implements Listener {
 			if ($this->isInHitbox($level, $x, $yb, ($z + 0.05))) $zb = $zb - 0.3;
 
 
-            if($this->isInHitbox($level, $xb, $yb, $zb)) {
-                break;
-            } else {
+			if ($this->isInHitbox($level, $xb, $yb, $zb)) {
+				break;
+			} else {
 				$x = $xb;
 				$y = $yb;
 				$z = $zb;
 			}
-        }
+		}
 
 		//Check if pearl lands in an area too small for the player
 		foreach (range(0.1, 1.8, 0.1) as $n) {
-			if($this->isInHitbox($level, $x, ($y + $n), $z)) {
+			if ($this->isInHitbox($level, $x, ($y + $n), $z)) {
 
 				//Teleport the player into the middle of the block so they can't phase into an adjacent block.
-				if(isset($level->getBlockAt((int)$xb, (int)$yb, (int)$zb)->getCollisionBoxes()[0])) {
+				if (isset($level->getBlockAt((int)$xb, (int)$yb, (int)$zb)->getCollisionBoxes()[0])) {
 					$blockHitBox = $level->getBlockAt((int)$xb, (int)$yb, (int)$zb)->getCollisionBoxes()[0];
-					if($x < 0) {
+					if ($x < 0) {
 						$x = (($blockHitBox->minX + $blockHitBox->maxX) / 2) - 1;
 					} else {
 						$x = ($blockHitBox->minX + $blockHitBox->maxX) / 2;
 					}
-					if($z < 0) {
+					if ($z < 0) {
 						$z = (($blockHitBox->minZ + $blockHitBox->maxZ) / 2) - 1;
 					} else {
 						$z = ($blockHitBox->minZ + $blockHitBox->maxZ) / 2;
@@ -116,8 +119,8 @@ class Main extends PluginBase implements Listener {
 					$event->cancel();
 					return;
 				} else {
-					if($x < 0) $x = $x + 1;
-					if($z < 0) $z = $z + 1;
+					if ($x < 0) $x = $x + 1;
+					if ($z < 0) $z = $z + 1;
 					$yaw = $entity->getLocation()->getYaw();
 					$pitch = $entity->getLocation()->getPitch();
 					$this->getScheduler()->scheduleDelayedTask(new TeleportTask($entity, new Location($x, $y, $z, $entity->getWorld(), $yaw, $pitch)), 5);
@@ -126,34 +129,36 @@ class Main extends PluginBase implements Listener {
 			}
 		}
 
-        //Readjust for negative quadrants
-        if($x < 0) $x = $x + 1;
-        if($z < 0) $z = $z + 1;
+		//Readjust for negative quadrants
+		if ($x < 0) $x = $x + 1;
+		if ($z < 0) $z = $z + 1;
 
 		//Send new safe location
 		$event->setTo(new Location($x, $y, $z, $level, 314.5, 0));
-    }
+	}
 
-    //Check if a set of coords are inside a block's HitBox
-    public function isInHitbox($level, $x, $y, $z) {
-        if(!isset($level->getBlockAt((int)$x, (int)$y, (int)$z)->getCollisionBoxes()[0])) return False;
-        foreach ($level->getBlockAt((int)$x, (int)$y, (int)$z)->getCollisionBoxes() as $blockHitBox) {
-			if($x < 0) $x = $x + 1;
-			if($z < 0) $z = $z + 1;
-			if (($blockHitBox->minX < $x) AND ($x < $blockHitBox->maxX) AND ($blockHitBox->minY < $y) AND ($y < $blockHitBox->maxY) AND ($blockHitBox->minZ < $z) AND ($z < $blockHitBox->maxZ)) return True;
+	//Check if a set of coords are inside a block's HitBox
+	public function isInHitbox($level, $x, $y, $z)
+	{
+		if (!isset($level->getBlockAt((int)$x, (int)$y, (int)$z)->getCollisionBoxes()[0])) return False;
+		foreach ($level->getBlockAt((int)$x, (int)$y, (int)$z)->getCollisionBoxes() as $blockHitBox) {
+			if ($x < 0) $x = $x + 1;
+			if ($z < 0) $z = $z + 1;
+			if (($blockHitBox->minX < $x) and ($x < $blockHitBox->maxX) and ($blockHitBox->minY < $y) and ($y < $blockHitBox->maxY) and ($blockHitBox->minZ < $z) and ($z < $blockHitBox->maxZ)) return True;
 		}
-        return False;
-    }
+		return False;
+	}
 
 	/**
-	 * @priority HIGH
+	 * @priority HIGHEST
 	 * @handleCancelled true
 	 */
 
-	public function onInteract(PlayerInteractEvent $event) {
+	public function onInteract(PlayerInteractEvent $event)
+	{
 		if ($event->getAction() !== PlayerInteractEvent::RIGHT_CLICK_BLOCK) return;
 		$player = $event->getPlayer();
-		if ($player->isCreative() or $player->isSpectator()) return;
+		if ($player->isCreative()) return;
 		$block = $event->getBlock();
 		if ($event->isCancelled()) {
 			if ($block instanceof Door or $block instanceof FenceGate or $block instanceof Trapdoor) {
@@ -193,7 +198,6 @@ class Main extends PluginBase implements Listener {
 							$player->teleport(new Vector3($playerPos->getX(), $playerPos->getY(), $playerPos->getZ()), $playerPos->getYaw(), $playerPos->getPitch());
 							$player->setMotion(new Vector3($xb, 0, $zb));
 						}
-
 					}
 
 					if ($this->getConfig()->get("CancelOpenDoor-Message")) $player->sendMessage($this->getConfig()->get("CancelOpenDoor-Message"));
@@ -203,60 +207,13 @@ class Main extends PluginBase implements Listener {
 	}
 
 	/**
-	 * @priority HIGH
+	 * @priority HIGHEST
 	 * @handleCancelled true
 	 */
-
-    public function onBlockBreak(BlockBreakEvent $event) {
-        if ($this->getConfig()->get("Prevent-Break-Block-Glitching")) {
-            $player = $event->getPlayer();
-            $block = $event->getBlock();
-			if ($player->isCreative() or $player->isSpectator()) return;
-            if ($event->isCancelled()) {
-
-				$playerPos = $player->getLocation();
-				$playerX = intval($playerPos->getX());
-				$playerY = intval($playerPos->getY());
-				$playerZ = intval($playerPos->getZ());
-
-				if($playerX < 0) $playerX = $playerX - 1;
-				if($playerZ < 0) $playerZ = $playerZ - 1;
-
-				$blockPos = $block->getPosition();
-				$blockX = intval($blockPos->getX());
-				$blockY = intval($blockPos->getY());
-				$blockZ = intval($blockPos->getZ());
-
-				if (($blockX == (int)$playerX) AND ($blockZ == (int)$playerZ) AND ($playerY > $blockY)) { #If block is under the player
-					foreach ($block->getCollisionBoxes() as $blockHitBox) {
-						$y = max([$playerY, $blockHitBox->maxY]);
-					}
-					$player->teleport(new Vector3($playerX, $y, $playerZ, $playerPos->getYaw(), $playerPos->getPitch()));
-				} else { #If block is on the side of the player
-					$xb = 0;
-					$zb = 0;
-					foreach ($block->getCollisionBoxes() as $blockHitBox) {
-						if (abs($playerX - ($blockHitBox->minX + $blockHitBox->maxX) / 2) > abs($playerZ - ($blockHitBox->minZ + $blockHitBox->maxZ) / 2)) {
-							$xb = (5 / ($playerX - ($blockHitBox->minX + $blockHitBox->maxX) / 2)) / 24;
-						} else {
-							$zb = (5 / ($playerZ - ($blockHitBox->minZ + $blockHitBox->maxZ) / 2)) / 24;
-						}
-					}
-					$player->setMotion(new Vector3($xb, 0, $zb));
-				}
-				if ($this->getConfig()->get("CancelBlockBreak-Message")) $player->sendMessage($this->getConfig()->get("CancelBlockBreak-Message"));
-            }
-        }
-    }
-
-	/**
-	 * @priority HIGH
-	 * @handleCancelled true
-	 */
-
-    public function onBlockPlace(BlockPlaceEvent $event) {
-        if ($this->getConfig()->get("Prevent-Place-Block-Glitching")) {
-            $player = $event->getPlayer();
+	public function onBlockPlace(BlockPlaceEvent $event)
+	{
+		if ($this->getConfig()->get("Prevent-Place-Block-Glitching")) {
+			$player = $event->getPlayer();
 			if ($player->isCreative() or $player->isSpectator()) return;
 			if ($event->isCancelled()) {
 
@@ -281,26 +238,52 @@ class Main extends PluginBase implements Listener {
 					}
 				}
 			}
-        }
-    }
+		}
+	}
 
-	public function onCommandPre(CommandEvent $event){
-        if ($this->getConfig()->get("Prevent-Command-Glitching")) {
-            if((substr($event->getCommand(), 0, 2) == "/ ") || (substr($event->getCommand(), 0, 2) == "/\\") || (substr($event->getCommand(), 0, 2) == "/\"") || (substr($event->getCommand(), -1, 1) === "\\")){
-                $event->cancel();
-                if ($this->getConfig()->get("CancelCommand-Message")) {
-                    $event->getSender()->sendMessage($this->getConfig()->get("CancelCommand-Message"));
-                }
-            }
-        }
-    }
+	public function onCommandPre(CommandEvent $event)
+	{
+		if ($this->getConfig()->get("Prevent-Command-Glitching")) {
+			if ((substr($event->getCommand(), 0, 2) == "/ ") || (substr($event->getCommand(), 0, 2) == "/\\") || (substr($event->getCommand(), 0, 2) == "/\"") || (substr($event->getCommand(), -1, 1) === "\\")) {
+				$event->cancel();
+				if ($this->getConfig()->get("CancelCommand-Message")) {
+					$event->getSender()->sendMessage($this->getConfig()->get("CancelCommand-Message"));
+				}
+			}
+		}
+	}
+
+	public function onPlayerMove(PlayerMoveEvent $event)
+	{
+		$from = $event->getFrom();
+		$to = $event->getTo();
+
+		if ($from->getX() === $to->getX() && $from->getY() === $to->getY() && $from->getZ() === $to->getZ()) return;
+
+		$player = $event->getPlayer();
+		$playerLocation = $player->getLocation();
+		$world = $player->getWorld();
+		$block = $world->getBlock($playerLocation);
+		$blockAbove = $world->getBlock($playerLocation->add(0, 1, 0));
+		$blockAboveTwo = $world->getBlock($playerLocation->add(0, 2, 0));
+
+		if (!$block->isTransparent()) {
+			if ($blockAbove->isTransparent() && $blockAboveTwo->isTransparent()) {
+				$player->teleport($playerLocation->add(0, 1, 0), $playerLocation->getYaw(), $playerLocation->getPitch());
+			} else {
+				$player->teleport($from);
+			}
+		}
+	}
 }
 
-class TeleportTask extends Task {
+class TeleportTask extends Task
+{
 	private $entity;
 	private $location;
 
-	public function __construct(Entity $entity, Location $location) {
+	public function __construct(Entity $entity, Location $location)
+	{
 		$this->entity = $entity;
 		$this->location = $location;
 	}
@@ -311,16 +294,19 @@ class TeleportTask extends Task {
 	}
 }
 
-class MotionTask extends Task {
+class MotionTask extends Task
+{
 	private $entity;
 	private $vector3;
 
-	public function __construct(Entity $entity, Vector3 $vector3) {
+	public function __construct(Entity $entity, Vector3 $vector3)
+	{
 		$this->entity = $entity;
 		$this->vector3 = $vector3;
 	}
 
-	public function onRun(): void {
+	public function onRun(): void
+	{
 		$this->entity->setMotion($this->vector3);
 	}
 }
