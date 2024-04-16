@@ -7,18 +7,11 @@ namespace Max\AntiGlitch;
 use pocketmine\block\Door;
 use pocketmine\block\FenceGate;
 use pocketmine\block\Trapdoor;
-use pocketmine\entity\Entity;
 use pocketmine\math\Vector3;
 use pocketmine\plugin\PluginBase;
 use pocketmine\event\Listener;
 
-use pocketmine\player\Player;
-use pocketmine\scheduler\Task;
-use pocketmine\entity\projectile\EnderPearl;
-use pocketmine\entity\Location;
-
 use pocketmine\event\player\PlayerInteractEvent;
-use pocketmine\event\entity\{ProjectileHitEvent, EntityTeleportEvent};
 use pocketmine\event\block\BlockPlaceEvent;
 use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\event\server\CommandEvent;
@@ -47,29 +40,31 @@ class Main extends PluginBase implements Listener
 
 		if (!$this->getConfig()->get("Prevent-Open-Door-Glitching")) return;
 
-		$playerPos = $player->getLocation();
-		$blockPos = $block->getPosition();
+		$playerLocation = $player->getLocation();
+		$blockPosition = $block->getPosition();
 
-		$distance = $playerPos->distance($blockPos);
+		$distance = $playerLocation->distance($blockPosition);
 		if ($distance > 2) return;
 
-		$playerX = intval($playerPos->getX());
-		$playerY = intval($playerPos->getY());
-		$playerZ = intval($playerPos->getZ());
+		$playerX = (int) $playerLocation->getX();
+		$playerY = (int) $playerLocation->getY();
+		$playerZ = (int) $playerLocation->getZ();
+
 		if ($playerX < 0) $playerX = $playerX - 1;
 		if ($playerZ < 0) $playerZ = $playerZ - 1;
 
+		$blockX = (int) $blockPosition->getX();
+		$blockY = (int) $blockPosition->getY();
+		$blockZ = (int) $blockPosition->getZ();
 
-		$blockX = intval($blockPos->getX());
-		$blockY = intval($blockPos->getY());
-		$blockZ = intval($blockPos->getZ());
-
-		if (($blockX == (int)$playerX) and ($blockZ == (int)$playerZ) and ($playerY > $blockY)) { #If block is under the player
+		// If block is under the player
+		if (($blockX === $playerX) && ($blockZ === $playerZ) && ($playerY > $blockY)) {
 			foreach ($block->getCollisionBoxes() as $blockHitBox) {
-				$playerY = max([$playerY, $blockHitBox->maxY + 0.05]);
+				$newY = max([$playerY, $blockHitBox->maxY + 0.05]);
 			}
-			$player->teleport(new Vector3($playerX, $playerY, $playerZ), $playerPos->getYaw(), $playerPos->getPitch());
-		} else { #If block is on the side of the player
+			$player->teleport(new Vector3($playerX, $newY, $playerZ), $playerLocation->getYaw(), $playerLocation->getPitch());
+		} else {
+			// If block is on the side of the player
 			foreach ($block->getCollisionBoxes() as $blockHitBox) {
 				if (abs($playerX - ($blockHitBox->minX + $blockHitBox->maxX) / 2) > abs($playerZ - ($blockHitBox->minZ + $blockHitBox->maxZ) / 2)) {
 					$xb = (9 / ($playerX - ($blockHitBox->minX + $blockHitBox->maxX) / 2)) / 25;
@@ -78,7 +73,7 @@ class Main extends PluginBase implements Listener
 					$xb = 0;
 					$zb = (9 / ($playerZ - ($blockHitBox->minZ + $blockHitBox->maxZ) / 2)) / 25;
 				}
-				$player->teleport(new Vector3($playerPos->getX(), $playerPos->getY(), $playerPos->getZ()), $playerPos->getYaw(), $playerPos->getPitch());
+				$player->teleport(new Vector3($playerLocation->getX(), $playerLocation->getY(), $playerLocation->getZ()), $playerLocation->getYaw(), $playerLocation->getPitch());
 				$player->setMotion(new Vector3($xb, 0, $zb));
 			}
 		}
@@ -97,10 +92,10 @@ class Main extends PluginBase implements Listener
 		if ($player->isCreative()) return;
 		if (!$event->isCancelled()) return;
 
-		$playerPos = $player->getLocation();
-		$playerX = (int) $playerPos->getX();
-		$playerY = (int) $playerPos->getY();
-		$playerZ = (int) $playerPos->getZ();
+		$playerLocation = $player->getLocation();
+		$playerX = (int) $playerLocation->getX();
+		$playerY = (int) $playerLocation->getY();
+		$playerZ = (int) $playerLocation->getZ();
 
 		if ($playerX < 0) $playerX = $playerX - 1;
 		if ($playerZ < 0) $playerZ = $playerZ - 1;
@@ -113,8 +108,7 @@ class Main extends PluginBase implements Listener
 
 			// If block is under the player
 			if (($blockX === $playerX) && ($blockZ === $playerZ) && ($playerY > $blockY)) {
-				$playerMotion = $player->getMotion();
-				$player->setMotion(new Vector3($playerMotion->getX(), -0.5, $playerMotion->getZ()));
+				$player->teleport($playerLocation->subtract(0, 0.8, 0), $playerLocation->getYaw(), $playerLocation->getPitch());
 				if ($this->getConfig()->get("CancelBlockPlace-Message")) $player->sendMessage($this->getConfig()->get("CancelBlockPlace-Message"));
 			}
 		}
@@ -150,27 +144,9 @@ class Main extends PluginBase implements Listener
 		if ($player->isSpectator()) return;
 
 		if ($blockAbove->isTransparent() && $blockAboveTwo->isTransparent()) {
-			$playerMotion = $player->getMotion();
-			$player->setMotion(new Vector3($playerMotion->getX(), 0.5, $playerMotion->getZ()));
+			$player->teleport($playerLocation->add(0, 0.8, 0), $playerLocation->getYaw(), $playerLocation->getPitch());
 		} else {
 			$player->teleport($from);
 		}
-	}
-}
-
-class MotionTask extends Task
-{
-	private $entity;
-	private $vector3;
-
-	public function __construct(Entity $entity, Vector3 $vector3)
-	{
-		$this->entity = $entity;
-		$this->vector3 = $vector3;
-	}
-
-	public function onRun(): void
-	{
-		$this->entity->setMotion($this->vector3);
 	}
 }
