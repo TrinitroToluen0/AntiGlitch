@@ -268,6 +268,7 @@ class Main extends PluginBase implements Listener
 		$blockAboveTwo = $world->getBlock($playerLocation->add(0, 2, 0));
 
 		if (!$block->isTransparent()) {
+			if($player->isCreative()) return;
 			if ($blockAbove->isTransparent() && $blockAboveTwo->isTransparent()) {
 				$player->teleport($playerLocation->add(0, 1, 0), $playerLocation->getYaw(), $playerLocation->getPitch());
 			} else {
