@@ -144,9 +144,11 @@ class Main extends PluginBase implements Listener
 		if ($player->isSpectator()) return;
 
 		if ($blockAbove->isTransparent() && $blockAboveTwo->isTransparent()) {
-			$player->teleport($playerLocation->add(0, 0.8, 0), $playerLocation->getYaw(), $playerLocation->getPitch());
+			$player->teleport($playerLocation->add(0, 1, 0), $playerLocation->getYaw(), $playerLocation->getPitch());
 		} else {
-			$player->teleport($from);
+			if(!$world->getBlock($from->subtract(0, 1, 0))->isTransparent() && $world->getBlock($from->add(0, 1, 0))->isTransparent()&& $world->getBlock($from->add(0, 2, 0))->isTransparent()) {
+				$player->teleport($from);
+			}
 		}
 	}
 }
